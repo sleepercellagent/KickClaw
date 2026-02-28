@@ -1,7 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import { createHash } from "crypto";
 
 const http = httpRouter();
 
@@ -35,17 +34,17 @@ http.route({
   }),
 });
 
-// ─── Auth helper ────────────────────────────────────────────────────────────
+// ─── Auth helper (no Node.js crypto — delegates to authActions) ─────────────
 
 async function getAgentFromRequest(ctx: any, request: Request) {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.replace("Bearer ", "").trim();
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  return ctx.runQuery(internal.auth.verifyToken, { tokenHash });
+  // Delegate hashing to Node.js action
+  return ctx.runAction(internal.authActions.hashAndVerifyToken, { token });
 }
 
-// ─── D-3: Auth Routes ───────────────────────────────────────────────────────
+// ─── Auth Routes ────────────────────────────────────────────────────────────
 
 // POST /api/auth/challenge
 http.route({
@@ -71,7 +70,7 @@ http.route({
     try {
       const { walletAddress, signature } = await request.json();
       if (!walletAddress || !signature) return err("walletAddress and signature required");
-      const result = await ctx.runAction(api.auth.verifySignature, { walletAddress, signature });
+      const result = await ctx.runAction(api.authActions.verifySignature, { walletAddress, signature });
       return json(result);
     } catch (e: any) {
       return err(e.message, 401);
@@ -116,7 +115,7 @@ http.route({
   }),
 });
 
-// GET /api/listings/:id
+// GET /api/listings/get?id=xxx
 http.route({
   path: "/api/listings/get",
   method: "GET",
@@ -153,7 +152,7 @@ http.route({
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 
-// GET /api/listings/:id/comments  →  /api/comments?listingId=xxx
+// GET /api/comments?listingId=xxx
 http.route({
   path: "/api/comments",
   method: "GET",
@@ -168,7 +167,7 @@ http.route({
   }),
 });
 
-// POST /api/comments  (top-level)
+// POST /api/comments
 http.route({
   path: "/api/comments",
   method: "POST",

@@ -1,27 +1,15 @@
-import { v } from "convex/values";
+"use node";
+
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { randomBytes, createHash } from "crypto";
 
-// ─── D-4: GitHub OAuth Flow ────────────────────────────────────────────────
-//
-// Flow:
-//   1. Agent calls POST /api/auth/oauth/initiate with bearer token
-//   2. Returns a GitHub OAuth URL with state param
-//   3. Agent (or human) opens URL in browser, authorizes
-//   4. GitHub redirects to GET /api/auth/oauth/callback with code + state
-//   5. We exchange code for GitHub user info, link to agent, upgrade tier
-//
+// ─── D-4: GitHub OAuth Flow (Node.js runtime) ─────────────────────────────
 
 // In-memory state store (fine for hackathon; use DB for production)
 const pendingOAuth = new Map<string, { agentId: string; expiresAt: number }>();
 
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
-const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI!;
-
 // POST /api/auth/oauth/initiate
-// Requires bearer token. Returns { url } to redirect agent's owner to.
 export const initiate = httpAction(async (ctx, request) => {
   // Verify bearer token
   const authHeader = request.headers.get("Authorization");
@@ -35,12 +23,14 @@ export const initiate = httpAction(async (ctx, request) => {
     return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401 });
   }
 
-  // Generate state param
   const state = randomBytes(16).toString("hex");
   pendingOAuth.set(state, {
     agentId: agent._id,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    expiresAt: Date.now() + 10 * 60 * 1000,
   });
+
+  const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
+  const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI!;
 
   const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&state=${state}&scope=read:user`;
 
@@ -50,7 +40,6 @@ export const initiate = httpAction(async (ctx, request) => {
 });
 
 // GET /api/auth/oauth/callback
-// GitHub redirects here with ?code=xxx&state=xxx
 export const callback = httpAction(async (ctx, request) => {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -60,13 +49,15 @@ export const callback = httpAction(async (ctx, request) => {
     return new Response("Missing code or state", { status: 400 });
   }
 
-  // Validate state
   const pending = pendingOAuth.get(state);
   if (!pending || Date.now() > pending.expiresAt) {
-    pendingOAuth.delete(state!);
+    pendingOAuth.delete(state);
     return new Response("Invalid or expired OAuth state", { status: 400 });
   }
   pendingOAuth.delete(state);
+
+  const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
+  const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 
   // Exchange code for access token
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {

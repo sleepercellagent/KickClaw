@@ -1,26 +1,15 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery, action } from "./_generated/server";
-import { internal } from "./_generated/api";
-import { createHash, randomBytes } from "crypto";
+import { mutation, internalMutation, internalQuery } from "./_generated/server";
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-function generateToken(): string {
-  return randomBytes(32).toString("hex");
-}
-
-// ─── D-2: Wallet Challenge-Response Auth ───────────────────────────────────
+// ─── D-2: Wallet Auth — Mutations & Queries (Convex runtime) ───────────────
 
 // Step 1: Generate a nonce-based challenge for a wallet to sign
 export const createChallenge = mutation({
   args: { walletAddress: v.string() },
   handler: async (ctx, { walletAddress }) => {
     const normalized = walletAddress.toLowerCase();
-    const nonce = randomBytes(16).toString("hex");
+    // Use Math.random for nonce (no crypto needed in Convex runtime)
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
     const challenge = `Sign this message to authenticate with AgentFund.\nWallet: ${normalized}\nNonce: ${nonce}\nTimestamp: ${Date.now()}`;
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
 
@@ -41,56 +30,7 @@ export const createChallenge = mutation({
   },
 });
 
-// Step 2: Verify wallet signature and issue bearer token
-export const verifySignature = action({
-  args: {
-    walletAddress: v.string(),
-    signature: v.string(),
-  },
-  handler: async (ctx, { walletAddress, signature }) => {
-    const { ethers } = await import("ethers");
-    const normalized = walletAddress.toLowerCase();
-
-    // Get challenge
-    const challengeDoc = await ctx.runQuery(internal.auth.getChallengeForWallet, {
-      walletAddress: normalized,
-    });
-    if (!challengeDoc) throw new Error("No challenge found. Request a new one.");
-    if (Date.now() > challengeDoc.expiresAt) throw new Error("Challenge expired.");
-
-    // Verify signature
-    let recoveredAddress: string;
-    try {
-      recoveredAddress = ethers.verifyMessage(challengeDoc.challenge, signature).toLowerCase();
-    } catch {
-      throw new Error("Invalid signature.");
-    }
-    if (recoveredAddress !== normalized) throw new Error("Signature does not match wallet.");
-
-    // Clean up used challenge
-    await ctx.runMutation(internal.auth.deleteChallenge, { id: challengeDoc._id });
-
-    // Get or create agent
-    const agent = await ctx.runMutation(internal.auth.getOrCreateAgent, {
-      walletAddress: normalized,
-    });
-
-    // Issue bearer token
-    const token = generateToken();
-    const tokenHash = hashToken(token);
-    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
-
-    await ctx.runMutation(internal.auth.storeToken, {
-      agentId: agent._id,
-      tokenHash,
-      expiresAt,
-    });
-
-    return { token, agent };
-  },
-});
-
-// ─── Internal helpers ──────────────────────────────────────────────────────
+// ─── Internal helpers (used by authActions.ts and http.ts) ─────────────────
 
 export const getChallengeForWallet = internalQuery({
   args: { walletAddress: v.string() },
@@ -138,7 +78,7 @@ export const storeToken = internalMutation({
   },
 });
 
-// Used by HTTP router to validate incoming requests
+// Used by HTTP router to validate incoming requests (takes pre-hashed token)
 export const verifyToken = internalQuery({
   args: { tokenHash: v.string() },
   handler: async (ctx, { tokenHash }) => {
@@ -176,7 +116,6 @@ export async function assertTier(
   return agent;
 }
 
-// Upgrade agent tier (called after OAuth verification)
 export const upgradeTier = internalMutation({
   args: {
     agentId: v.id("agents"),
