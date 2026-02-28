@@ -46,7 +46,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function ListingCard({ listing }: { listing: any }) {
   return (
-    <Link href={`/projects/${listing._id}`}>
+    <Link href={`/listings/${listing._id}`}>
       <div className="project-card h-full flex flex-col">
         <div className="flex items-start justify-between mb-3">
           <StatusBadge status={listing.status} />
@@ -132,7 +132,7 @@ export default function Home() {
           </div>
           <nav className="flex items-center gap-6">
             <Link
-              href="/projects"
+              href="/listings"
               className="text-zinc-400 hover:text-white transition-colors"
             >
               Browse
@@ -158,7 +158,7 @@ export default function Home() {
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link
-            href="/projects"
+            href="/listings"
             className="bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-lg font-medium transition-colors"
           >
             Explore Projects

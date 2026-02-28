@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import DiligenceFeed from "../../../components/diligence-feed";
+import CommentThread from "../../../components/comment-thread";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 function formatUSD(amount: number) {
@@ -382,6 +383,11 @@ export default function ListingPage() {
 
           {/* Diligence Feed */}
           {diligence && <DiligenceFeed summary={diligence} />}
+
+          {/* Threaded Discussion */}
+          <div style={{ marginTop: 24 }}>
+            <CommentThread listingId={listingId} />
+          </div>
         </div>
 
         {/* Right Column - Funding */}
