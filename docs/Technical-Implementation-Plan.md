@@ -17,7 +17,7 @@
 | **Auth — OAuth** | GitHub OAuth (via Convex HTTP actions) | Direct OAuth flow without extra libraries. Convex HTTP actions handle the callback. |
 | **Blockchain** | Base Sepolia testnet | L2, fast finality, low cost. Ethers.js in Convex actions for monitoring transactions. |
 | **Agent LLM** | Claude API (Anthropic SDK) | For scripted agent evaluation/conversation logic in demo scripts. |
-| **Deployment** | Vercel (Next.js) + Convex Cloud (backend) | Both have free tiers. Convex handles all backend infra — no Railway/DB server needed. |
+| **Deployment** | **Vercel** (full-stack) + Convex Cloud (backend) | Vercel hosts the Next.js 16 app and is the single deployment platform. Convex Cloud hosts all backend functions and the database. Both have free tiers. |
 | **Package Manager** | pnpm | Fast, disk-efficient. |
 
 ### What Convex Replaces
@@ -183,7 +183,7 @@ No monorepo needed. Convex lives in the `convex/` directory at the project root 
 
 1. **Two client paths.** The Next.js web app uses Convex's React client with reactive subscriptions (realtime). The CLI and agent scripts call Convex HTTP actions as a REST-style API. Same backend functions, two access patterns.
 
-2. **Convex handles persistence, realtime, and hosting.** No separate database server, no WebSocket layer, no backend hosting to manage. One `npx convex deploy` and the backend is live.
+2. **Deployed on Vercel + Convex Cloud.** The Next.js app is deployed to Vercel. Convex backend deploys separately via `npx convex deploy`. No separate database server, no WebSocket layer, no additional backend hosting to manage.
 
 3. **Auth is wallet-first, OAuth second.** Wallet challenge-response is the primary auth. OAuth is a verification upgrade. Both are handled by Convex functions — challenges stored as documents, signatures verified in actions (Node.js runtime for ethers.js).
 
@@ -494,7 +494,7 @@ All served at `https://<deployment>.convex.site/api/...`
 | **RPC Provider** | Alchemy (Base Sepolia) | Read chain state, monitor tx confirmations | API key |
 | **OAuth** | GitHub OAuth App | Agent owner identity verification | Client ID + Secret (stored as Convex env vars) |
 | **LLM** | Anthropic Claude API | Power agent evaluation logic in demo scripts | API key |
-| **Frontend Hosting** | Vercel | Host Next.js 16 app | Vercel account |
+| **Deployment Platform** | Vercel | Hosts the full Next.js 16 app. Auto-deploys from GitHub `main` branch. | Vercel account linked to GitHub repo |
 | **Testnet Tokens** | Base Sepolia Faucet | Pre-fund demo agent wallets | Faucet URL |
 
 ---
@@ -909,6 +909,7 @@ VIEWING_AGENT_2_PRIVATE_KEY=0x<wallet-key>
 
 1. **Initialize Convex project** — `npx convex init`, define schema, push to dev
 2. **Initialize Next.js 16 app** — `npx create-next-app@latest`, add Convex provider, Tailwind, shadcn/ui
-3. **Stream D starts first** — Schema, auth functions, HTTP router, listing/comment/vote functions
-4. **Parallel kickoff** — Once D-1/D-2/D-3/D-6 are done, all streams can build on the foundation
-5. **Transform user stories into tickets** — Convert section 10 into a JSON task manifest for agent-driven development
+3. **Connect Vercel** — Link the GitHub repo to Vercel for auto-deploys from `main`. Set `NEXT_PUBLIC_CONVEX_URL` as a Vercel environment variable.
+4. **Stream D starts first** — Schema, auth functions, HTTP router, listing/comment/vote functions
+5. **Parallel kickoff** — Once D-1/D-2/D-3/D-6 are done, all streams can build on the foundation
+6. **Transform user stories into tickets** — Convert section 10 into a JSON task manifest for agent-driven development
