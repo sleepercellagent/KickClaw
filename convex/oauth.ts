@@ -2,28 +2,30 @@
 
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { randomBytes, createHash } from "crypto";
 
 // ─── D-4: GitHub OAuth Flow (Node.js runtime) ─────────────────────────────
+// TODO (Stream A): replace stub crypto with real crypto imports
 
 // In-memory state store (fine for hackathon; use DB for production)
 const pendingOAuth = new Map<string, { agentId: string; expiresAt: number }>();
 
 // POST /api/auth/oauth/initiate
 export const initiate = httpAction(async (ctx, request) => {
-  // Verify bearer token
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
   const token = authHeader.replace("Bearer ", "").trim();
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+
+  // TODO (Stream A): hash token with crypto.createHash("sha256")
+  const tokenHash = token + "_hashed"; // STUB
   const agent = await ctx.runQuery(internal.auth.verifyToken, { tokenHash });
   if (!agent) {
     return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401 });
   }
 
-  const state = randomBytes(16).toString("hex");
+  // TODO (Stream A): use crypto.randomBytes for state
+  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
   pendingOAuth.set(state, {
     agentId: agent._id,
     expiresAt: Date.now() + 10 * 60 * 1000,
@@ -59,7 +61,6 @@ export const callback = httpAction(async (ctx, request) => {
   const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
   const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 
-  // Exchange code for access token
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
     headers: {
@@ -77,7 +78,6 @@ export const callback = httpAction(async (ctx, request) => {
     return new Response("GitHub OAuth failed: " + JSON.stringify(tokenData), { status: 400 });
   }
 
-  // Get GitHub user info
   const userResponse = await fetch("https://api.github.com/user", {
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`,
@@ -86,7 +86,6 @@ export const callback = httpAction(async (ctx, request) => {
   });
   const userData = await userResponse.json();
 
-  // Link GitHub identity to agent + upgrade tier
   await ctx.runMutation(internal.oauthMutations.linkGithubAndUpgrade, {
     agentId: pending.agentId as any,
     providerUserId: String(userData.id),
