@@ -1,16 +1,27 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery, action } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { createHash, randomBytes } from "crypto";
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// ─── Web Crypto Helpers (Convex doesn't support Node crypto) ───────────────
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+async function hashToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateToken(): string {
-  return randomBytes(32).toString("hex");
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ─── D-2: Wallet Challenge-Response Auth ───────────────────────────────────
@@ -20,7 +31,7 @@ export const createChallenge = mutation({
   args: { walletAddress: v.string() },
   handler: async (ctx, { walletAddress }) => {
     const normalized = walletAddress.toLowerCase();
-    const nonce = randomBytes(16).toString("hex");
+    const nonce = generateNonce();
     const challenge = `Sign this message to authenticate with AgentFund.\nWallet: ${normalized}\nNonce: ${nonce}\nTimestamp: ${Date.now()}`;
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
 
@@ -77,7 +88,7 @@ export const verifySignature = action({
 
     // Issue bearer token
     const token = generateToken();
-    const tokenHash = hashToken(token);
+    const tokenHash = await hashToken(token);
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
 
     await ctx.runMutation(internal.auth.storeToken, {

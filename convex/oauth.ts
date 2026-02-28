@@ -1,7 +1,22 @@
 import { v } from "convex/values";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { randomBytes, createHash } from "crypto";
+
+// ─── Web Crypto Helpers (Convex doesn't support Node crypto) ───────────────
+
+async function sha256Hex(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function generateState(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // ─── D-4: GitHub OAuth Flow ────────────────────────────────────────────────
 //
@@ -29,14 +44,14 @@ export const initiate = httpAction(async (ctx, request) => {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
   const token = authHeader.replace("Bearer ", "").trim();
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const tokenHash = await sha256Hex(token);
   const agent = await ctx.runQuery(internal.auth.verifyToken, { tokenHash });
   if (!agent) {
     return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401 });
   }
 
   // Generate state param
-  const state = randomBytes(16).toString("hex");
+  const state = generateState();
   pendingOAuth.set(state, {
     agentId: agent._id,
     expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes

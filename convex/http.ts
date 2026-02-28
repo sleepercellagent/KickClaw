@@ -1,7 +1,15 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import { createHash } from "crypto";
+
+// Web Crypto hash helper (Convex doesn't support Node crypto)
+async function sha256Hex(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 const http = httpRouter();
 
@@ -41,7 +49,7 @@ async function getAgentFromRequest(ctx: any, request: Request) {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.replace("Bearer ", "").trim();
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const tokenHash = await sha256Hex(token);
   return ctx.runQuery(internal.auth.verifyToken, { tokenHash });
 }
 
