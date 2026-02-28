@@ -2,11 +2,11 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { assertTier } from "./auth";
 
-// ─── D-6: Listing Queries & Mutations ─────────────────────────────────────
+// ─── Listing Queries & Mutations ─────────────────────────────────────
 
 export const list = query({
   args: {
-    sort: v.optional(v.string()),   // "trending" | "newest" | "most_funded" | "most_discussed"
+    sort: v.optional(v.string()),
     limit: v.optional(v.number()),
     tag: v.optional(v.string()),
     search: v.optional(v.string()),
@@ -34,7 +34,6 @@ export const list = query({
 
     // Sort
     if (sort === "trending") {
-      // Weighted score: votes * 3 + comments * 2 + funded% * 10, decayed by age
       listings.sort((a, b) => {
         const score = (l: typeof a) => {
           const ageDays = (Date.now() - l._creationTime) / (1000 * 60 * 60 * 24);
@@ -62,6 +61,7 @@ export const get = query({
   },
 });
 
+// Authenticated create (requires verified agent)
 export const create = mutation({
   args: {
     agentId: v.id("agents"),
@@ -84,16 +84,71 @@ export const create = mutation({
       pitch: args.pitch,
       goalAmount: args.goalAmount,
       tokenSymbol: args.tokenSymbol ?? "USDC",
-      network: args.network ?? "base-sepolia",
+      network: args.network ?? "base",
       currentFunded: 0,
       deadline: args.deadline,
-      status: "draft",
+      status: "active", // Go live immediately
       tags: args.tags ?? [],
       voteCount: 0,
       commentCount: 0,
     });
 
-    return ctx.db.get(id);
+    return id;
+  },
+});
+
+// Public create (for demo - creates agent automatically)
+export const createPublic = mutation({
+  args: {
+    walletAddress: v.optional(v.string()),
+    displayName: v.optional(v.string()),
+    title: v.string(),
+    description: v.string(),
+    pitch: v.optional(v.string()),
+    goalAmount: v.number(),
+    deadline: v.number(),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    // Generate a placeholder wallet if not provided
+    const wallet = args.walletAddress || `0x${Date.now().toString(16)}`;
+    
+    // Check if agent exists, create if not
+    let agent = await ctx.db
+      .query("agents")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", wallet))
+      .first();
+
+    if (!agent) {
+      const agentId = await ctx.db.insert("agents", {
+        walletAddress: wallet,
+        displayName: args.displayName || `Agent-${wallet.slice(0, 8)}`,
+        isHuman: false,
+        tier: "verified", // Auto-verify for demo
+      });
+      agent = await ctx.db.get(agentId);
+    }
+
+    if (!agent) throw new Error("Failed to create agent");
+
+    // Create the listing
+    const listingId = await ctx.db.insert("listings", {
+      agentId: agent._id,
+      title: args.title,
+      description: args.description,
+      pitch: args.pitch,
+      goalAmount: args.goalAmount,
+      tokenSymbol: "USDC",
+      network: "base",
+      currentFunded: 0,
+      deadline: args.deadline,
+      status: "active",
+      tags: args.tags ?? [],
+      voteCount: 0,
+      commentCount: 0,
+    });
+
+    return { listingId, agentId: agent._id };
   },
 });
 
