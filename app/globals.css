@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #ededed;
+  --background: #0a0a0a;
+  --accent: #3b82f6;
+  --success: #22c55e;
+  --warning: #eab308;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  min-height: 100vh;
+}
+
+/* Gradient backgrounds */
+.gradient-bg {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+}
+
+/* Progress bar for funding */
+.funding-bar {
+  @apply h-2 rounded-full bg-zinc-800 overflow-hidden;
+}
+
+.funding-bar-fill {
+  @apply h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500;
+}
+
+/* Card hover effect */
+.project-card {
+  @apply bg-zinc-900 border border-zinc-800 rounded-xl p-6 transition-all duration-200;
+}
+
+.project-card:hover {
+  @apply border-zinc-700 shadow-lg shadow-blue-500/5;
+}

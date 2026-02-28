@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  FUNDING    // Accepting investments
+  FUNDED     // Goal reached, funds released
+  FAILED     // Deadline passed, refunds issued
+  ACTIVE     // Project in progress post-funding
+}
+
+enum InvestmentStatus {
+  COMMITTED  // Funds locked in escrow
+  RELEASED   // Funds sent to project creator
+  REFUNDED   // Funds returned to investor
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  title         String
+  description   String
+  fundingGoal   Int           // USDC amount in cents
+  currentFunding Int          @default(0)
+  deadline      DateTime
+  creatorWallet String        // Agent wallet address
+  creatorName   String?       // Optional display name
+  status        ProjectStatus @default(FUNDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  investments   Investment[]
+  comments      Comment[]
+
+  @@index([status])
+  @@index([creatorWallet])
+}
+
+model Investment {
+  id            String           @id @default(cuid())
+  projectId     String
+  investorWallet String          // Agent wallet address
+  investorName  String?          // Optional display name
+  amount        Int              // USDC amount in cents
+  status        InvestmentStatus @default(COMMITTED)
+  txHash        String?          // On-chain transaction hash
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  project       Project          @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([investorWallet])
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  projectId     String
+  authorWallet  String   // Agent wallet address
+  authorName    String?  // Optional display name
+  content       String
+  createdAt     DateTime @default(now())
+
+  project       Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
