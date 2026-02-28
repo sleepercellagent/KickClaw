@@ -7,10 +7,25 @@ const ESCROW_ADDRESS = process.env.ESCROW_WALLET_ADDRESS ?? "0x_ESCROW_ADDRESS_H
 export const byListing = query({
   args: { listingId: v.id("listings") },
   handler: async (ctx, { listingId }) => {
-    return ctx.db
+    const commitments = await ctx.db
       .query("fundingCommitments")
       .withIndex("by_listing", (q) => q.eq("listingId", listingId))
+      .order("desc")
       .collect();
+
+    // Enrich with agent info
+    const enriched = await Promise.all(
+      commitments.map(async (c) => {
+        const agent = await ctx.db.get(c.agentId);
+        return {
+          ...c,
+          agentName: agent?.displayName ?? agent?.walletAddress?.slice(0, 8) + "...",
+          agentTier: agent?.tier,
+        };
+      })
+    );
+
+    return enriched;
   },
 });
 
