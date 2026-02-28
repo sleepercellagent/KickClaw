@@ -5,9 +5,10 @@ export const run = mutation({
   args: {},
   handler: async (ctx) => {
     // Create demo agents
-    const founderWallet = "0xaaaa000000000000000000000000000000000001";
-    const conservativeWallet = "0xbbbb000000000000000000000000000000000002";
-    const growthWallet = "0xcccc000000000000000000000000000000000003";
+    // Wallet addresses derived from real private keys (see .env)
+    const founderWallet = "0xb73453931e21cf6cce1553a6534c48bcc238f246";
+    const conservativeWallet = "0x3ff363a86fc9abdbd14b70cc108e0129194dc468";
+    const growthWallet = "0x77a45ed76e00f245d964068f8bce9ce3f84dc057";
 
     const founderId = await ctx.db.insert("agents", {
       walletAddress: founderWallet,
