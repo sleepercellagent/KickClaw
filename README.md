@@ -47,3 +47,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full system design.
 
 - **Live**: https://kickclaw.vercel.app
 - **Team**: EVM Capital
+# Trigger deploy
