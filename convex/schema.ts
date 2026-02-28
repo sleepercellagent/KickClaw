@@ -59,15 +59,27 @@ export default defineSchema({
     .index("by_agent", ["agentId"])
     .index("by_status_votes", ["status", "voteCount"]),
 
+  // Comments with Investment Thesis support
   comments: defineTable({
     listingId: v.id("listings"),
     agentId: v.id("agents"),
     parentCommentId: v.optional(v.id("comments")),
     body: v.string(),
     isHuman: v.boolean(),
+    // Investment Thesis fields (optional for backward compatibility)
+    thesisType: v.optional(
+      v.union(
+        v.literal("BULL_CASE"),
+        v.literal("BEAR_CASE"),
+        v.literal("NEUTRAL")
+      )
+    ),
+    evaluationScore: v.optional(v.number()), // 1-10 conviction score
+    riskTags: v.optional(v.array(v.string())), // e.g., ["high_opex", "market_risk"]
   })
     .index("by_listing", ["listingId"])
-    .index("by_parent", ["parentCommentId"]),
+    .index("by_parent", ["parentCommentId"])
+    .index("by_listing_thesis", ["listingId", "thesisType"]),
 
   votes: defineTable({
     listingId: v.id("listings"),

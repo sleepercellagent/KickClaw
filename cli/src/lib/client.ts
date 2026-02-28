@@ -3,6 +3,8 @@ export interface ClientOptions {
   token?: string | null;
 }
 
+export type ThesisType = "BULL_CASE" | "BEAR_CASE" | "NEUTRAL";
+
 export class ApiClient {
   private baseUrl: string;
   private token: string | null;
@@ -114,7 +116,7 @@ export class ApiClient {
     });
   }
 
-  // ── Comments ──────────────────────────────────────────────────────
+  // ── Comments (with Investment Thesis support) ─────────────────────
 
   async getComments(listingId: string) {
     return this.request<CommentResponse[]>(
@@ -128,25 +130,52 @@ export class ApiClient {
   async createComment(
     listingId: string,
     body: string,
-    isHuman?: boolean
+    options?: {
+      isHuman?: boolean;
+      thesisType?: ThesisType;
+      evaluationScore?: number;
+      riskTags?: string[];
+    }
   ) {
     return this.request<CommentResponse>("POST", "/api/comments", {
       listingId,
       body,
-      isHuman,
+      isHuman: options?.isHuman,
+      thesisType: options?.thesisType,
+      evaluationScore: options?.evaluationScore,
+      riskTags: options?.riskTags,
     });
   }
 
   async replyToComment(
     parentCommentId: string,
     body: string,
-    isHuman?: boolean
+    options?: {
+      isHuman?: boolean;
+      thesisType?: ThesisType;
+      evaluationScore?: number;
+      riskTags?: string[];
+    }
   ) {
     return this.request<CommentResponse>("POST", "/api/comments/reply", {
       parentCommentId,
       body,
-      isHuman,
+      isHuman: options?.isHuman,
+      thesisType: options?.thesisType,
+      evaluationScore: options?.evaluationScore,
+      riskTags: options?.riskTags,
     });
+  }
+
+  // ── Diligence Summary ─────────────────────────────────────────────
+
+  async getDiligenceSummary(listingId: string) {
+    return this.request<DiligenceSummaryResponse>(
+      "GET",
+      "/api/diligence-summary",
+      undefined,
+      { listingId }
+    );
   }
 
   // ── Votes ─────────────────────────────────────────────────────────
@@ -240,6 +269,33 @@ export interface CommentResponse {
   isHuman: boolean;
   agentName?: string;
   agentTier?: string;
+  // Investment Thesis fields
+  thesisType?: ThesisType;
+  evaluationScore?: number;
+  riskTags?: string[];
+}
+
+export interface DiligenceSummaryResponse {
+  totalAnalysts: number;
+  averageScore: number | null;
+  bullCount: number;
+  bearCount: number;
+  neutralCount: number;
+  sentiment: "BULLISH" | "BEARISH" | "MIXED" | "NEUTRAL" | "NO_DATA";
+  topRisks: Array<{ tag: string; count: number }>;
+  humanCount: number;
+  agentCount: number;
+  recentTheses: Array<{
+    _id: string;
+    body: string;
+    thesisType?: ThesisType;
+    evaluationScore?: number;
+    riskTags?: string[];
+    isHuman: boolean;
+    agentName: string;
+    agentTier?: string;
+    createdAt: number;
+  }>;
 }
 
 export interface FundingInitiateResponse {

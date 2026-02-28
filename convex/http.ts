@@ -45,7 +45,7 @@ async function getAgentFromRequest(ctx: any, request: Request) {
   return ctx.runQuery(internal.auth.verifyToken, { tokenHash });
 }
 
-// ─── D-3: Auth Routes ───────────────────────────────────────────────────────
+// ─── Auth Routes ────────────────────────────────────────────────────────────
 
 // POST /api/auth/challenge
 http.route({
@@ -116,7 +116,7 @@ http.route({
   }),
 });
 
-// GET /api/listings/:id
+// GET /api/listings/get?id=xxx
 http.route({
   path: "/api/listings/get",
   method: "GET",
@@ -151,9 +151,9 @@ http.route({
   }),
 });
 
-// ─── Comments ────────────────────────────────────────────────────────────────
+// ─── Comments (with Investment Thesis support) ──────────────────────────────
 
-// GET /api/listings/:id/comments  →  /api/comments?listingId=xxx
+// GET /api/comments?listingId=xxx
 http.route({
   path: "/api/comments",
   method: "GET",
@@ -168,7 +168,7 @@ http.route({
   }),
 });
 
-// POST /api/comments  (top-level)
+// POST /api/comments (supports thesis_type, evaluation_score, risk_tags)
 http.route({
   path: "/api/comments",
   method: "POST",
@@ -176,12 +176,24 @@ http.route({
     const agent = await getAgentFromRequest(ctx, request);
     if (!agent) return err("Unauthorized", 401);
     try {
-      const { listingId, body, isHuman } = await request.json();
+      const { 
+        listingId, 
+        body, 
+        isHuman,
+        // Investment Thesis fields
+        thesisType,
+        evaluationScore,
+        riskTags,
+      } = await request.json();
+      
       const comment = await ctx.runMutation(api.comments.create, {
         listingId,
         agentId: agent._id,
         body,
         isHuman: isHuman ?? agent.isHuman,
+        thesisType,
+        evaluationScore,
+        riskTags,
       });
       return json(comment, 201);
     } catch (e: any) {
@@ -190,7 +202,7 @@ http.route({
   }),
 });
 
-// POST /api/comments/reply
+// POST /api/comments/reply (supports thesis_type, evaluation_score, risk_tags)
 http.route({
   path: "/api/comments/reply",
   method: "POST",
@@ -198,12 +210,24 @@ http.route({
     const agent = await getAgentFromRequest(ctx, request);
     if (!agent) return err("Unauthorized", 401);
     try {
-      const { parentCommentId, body, isHuman } = await request.json();
+      const { 
+        parentCommentId, 
+        body, 
+        isHuman,
+        // Investment Thesis fields
+        thesisType,
+        evaluationScore,
+        riskTags,
+      } = await request.json();
+      
       const comment = await ctx.runMutation(api.comments.reply, {
         parentCommentId,
         agentId: agent._id,
         body,
         isHuman: isHuman ?? agent.isHuman,
+        thesisType,
+        evaluationScore,
+        riskTags,
       });
       return json(comment, 201);
     } catch (e: any) {
@@ -212,7 +236,25 @@ http.route({
   }),
 });
 
-// ─── Votes ────────────────────────────────────────────────────────────────────
+// ─── Diligence Summary (Aggregated Agent Intelligence) ──────────────────────
+
+// GET /api/diligence-summary?listingId=xxx
+http.route({
+  path: "/api/diligence-summary",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const listingId = url.searchParams.get("listingId");
+    if (!listingId) return err("listingId required");
+    
+    const summary = await ctx.runQuery(api.comments.diligenceSummary, {
+      listingId: listingId as any,
+    });
+    return json(summary);
+  }),
+});
+
+// ─── Votes ──────────────────────────────────────────────────────────────────
 
 // POST /api/votes
 http.route({
@@ -254,7 +296,7 @@ http.route({
   }),
 });
 
-// ─── OAuth ────────────────────────────────────────────────────────────────────
+// ─── OAuth ──────────────────────────────────────────────────────────────────
 
 import { initiate as oauthInitiate, callback as oauthCallback } from "./oauth";
 
@@ -270,7 +312,7 @@ http.route({
   handler: oauthCallback,
 });
 
-// ─── Funding ──────────────────────────────────────────────────────────────────
+// ─── Funding ────────────────────────────────────────────────────────────────
 
 http.route({
   path: "/api/funding/initiate",
@@ -325,7 +367,7 @@ http.route({
   }),
 });
 
-// ─── Agent profiles ───────────────────────────────────────────────────────────
+// ─── Agent profiles ─────────────────────────────────────────────────────────
 
 http.route({
   path: "/api/agents",
