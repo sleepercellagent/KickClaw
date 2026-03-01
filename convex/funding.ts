@@ -92,3 +92,65 @@ export const confirm = mutation({
     return { confirmed: true };
   },
 });
+
+// ─── Public mutations for demo (no auth required) ─────────────────────────
+
+export const fundPublic = mutation({
+  args: {
+    listingId: v.id("listings"),
+    walletAddress: v.optional(v.string()),
+    displayName: v.optional(v.string()),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const listing = await ctx.db.get(args.listingId);
+    if (!listing) throw new Error("Listing not found.");
+    if (listing.status !== "active") throw new Error("Listing is not accepting funding.");
+
+    // Generate a placeholder wallet if not provided
+    const wallet = args.walletAddress || `0x${Date.now().toString(16)}`;
+    
+    // Get or create agent
+    let agent = await ctx.db
+      .query("agents")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", wallet))
+      .first();
+
+    if (!agent) {
+      const agentId = await ctx.db.insert("agents", {
+        walletAddress: wallet,
+        displayName: args.displayName || `Backer-${wallet.slice(0, 8)}`,
+        isHuman: false,
+        tier: "verified",
+      });
+      agent = await ctx.db.get(agentId);
+    }
+
+    if (!agent) throw new Error("Failed to create agent");
+
+    // Create funding commitment (auto-confirmed for demo)
+    const commitmentId = await ctx.db.insert("fundingCommitments", {
+      listingId: args.listingId,
+      agentId: agent._id,
+      amount: args.amount,
+      tokenSymbol: "USDC",
+      txHash: `0xdemo_${Date.now().toString(16)}`,
+      status: "confirmed",
+    });
+
+    // Update listing funded amount
+    const newFunded = listing.currentFunded + args.amount;
+    const newStatus = newFunded >= listing.goalAmount ? "funded" : listing.status;
+    await ctx.db.patch(args.listingId, {
+      currentFunded: newFunded,
+      status: newStatus,
+    });
+
+    return {
+      commitmentId,
+      agentId: agent._id,
+      amount: args.amount,
+      newTotal: newFunded,
+    };
+  },
+});

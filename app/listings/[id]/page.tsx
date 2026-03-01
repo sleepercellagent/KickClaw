@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -139,6 +140,12 @@ export default function ListingPage() {
   const params = useParams();
   const listingId = params.id as string;
 
+  const [showFundModal, setShowFundModal] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  const [backerName, setBackerName] = useState("");
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundSuccess, setFundSuccess] = useState(false);
+
   const listing = useQuery(api.listings.get, {
     listingId: listingId as Id<"listings">,
   });
@@ -150,6 +157,32 @@ export default function ListingPage() {
   const diligence = useQuery(api.comments.diligenceSummary, {
     listingId: listingId as Id<"listings">,
   });
+
+  const fundProject = useMutation(api.funding.fundPublic);
+
+  const handleFund = async () => {
+    const amount = parseInt(fundAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    setIsFunding(true);
+    try {
+      await fundProject({
+        listingId: listingId as Id<"listings">,
+        displayName: backerName || undefined,
+        amount,
+      });
+      setFundSuccess(true);
+      setTimeout(() => {
+        setShowFundModal(false);
+        setFundSuccess(false);
+        setFundAmount("");
+        setBackerName("");
+      }, 2000);
+    } catch (err) {
+      console.error("Funding failed:", err);
+    }
+    setIsFunding(false);
+  };
 
   if (listing === undefined) {
     return (
@@ -523,6 +556,7 @@ export default function ListingPage() {
 
             {/* Fund Button */}
             <button
+              onClick={() => setShowFundModal(true)}
               style={{
                 width: "100%",
                 padding: "16px 0",
@@ -535,6 +569,15 @@ export default function ListingPage() {
                 cursor: "pointer",
                 letterSpacing: "0.02em",
                 boxShadow: "0 4px 24px rgba(0,230,118,0.2)",
+                transition: "transform 0.1s, box-shadow 0.2s",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 6px 32px rgba(0,230,118,0.3)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,230,118,0.2)";
               }}
             >
               Fund This Project →
@@ -549,7 +592,7 @@ export default function ListingPage() {
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Connect wallet to invest
+              Demo mode • No wallet required
             </div>
           </div>
 
@@ -619,6 +662,247 @@ export default function ListingPage() {
           KickClaw · Agent-powered crowdfunding on Base
         </span>
       </footer>
+
+      {/* Fund Modal */}
+      {showFundModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => !isFunding && setShowFundModal(false)}
+        >
+          <div
+            style={{
+              background: "#0d0d1a",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 16,
+              padding: 32,
+              width: "100%",
+              maxWidth: 420,
+              margin: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {fundSuccess ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    margin: "0 auto 16px",
+                    background: "rgba(0,230,118,0.12)",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#00e676"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h3
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#fff",
+                    marginBottom: 8,
+                  }}
+                >
+                  Funded! 🎉
+                </h3>
+                <p style={{ color: "#666", fontSize: 13 }}>
+                  Your contribution has been recorded
+                </p>
+              </div>
+            ) : (
+              <>
+                <h2
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 8,
+                  }}
+                >
+                  Fund This Project
+                </h2>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#666",
+                    marginBottom: 24,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  Demo mode — no real funds required
+                </p>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      marginBottom: 8,
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    Your Name (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={backerName}
+                    onChange={(e) => setBackerName(e.target.value)}
+                    placeholder="Anonymous Backer"
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "#111122",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 8,
+                      color: "#fff",
+                      fontSize: 15,
+                      outline: "none",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      marginBottom: 8,
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    Amount (USDC)
+                  </label>
+                  <input
+                    type="number"
+                    value={fundAmount}
+                    onChange={(e) => setFundAmount(e.target.value)}
+                    placeholder="1000"
+                    min="1"
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "#111122",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 8,
+                      color: "#fff",
+                      fontSize: 15,
+                      outline: "none",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  />
+                </div>
+
+                {/* Quick amounts */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 24,
+                  }}
+                >
+                  {[100, 500, 1000, 5000].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setFundAmount(amt.toString())}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        background:
+                          fundAmount === amt.toString()
+                            ? "rgba(0,230,118,0.15)"
+                            : "rgba(255,255,255,0.04)",
+                        border:
+                          fundAmount === amt.toString()
+                            ? "1px solid rgba(0,230,118,0.3)"
+                            : "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 6,
+                        color:
+                          fundAmount === amt.toString() ? "#00e676" : "#888",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      ${amt}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button
+                    onClick={() => setShowFundModal(false)}
+                    disabled={isFunding}
+                    style={{
+                      flex: 1,
+                      padding: "14px 0",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 8,
+                      color: "#888",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleFund}
+                    disabled={isFunding || !fundAmount}
+                    style={{
+                      flex: 2,
+                      padding: "14px 0",
+                      background:
+                        isFunding || !fundAmount
+                          ? "#333"
+                          : "linear-gradient(135deg, #00e676 0%, #00c853 100%)",
+                      border: "none",
+                      borderRadius: 8,
+                      color: isFunding || !fundAmount ? "#666" : "#000",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      cursor: isFunding || !fundAmount ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {isFunding ? "Processing..." : `Fund ${fundAmount ? `$${fundAmount}` : ""} USDC`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
