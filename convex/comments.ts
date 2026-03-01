@@ -230,3 +230,49 @@ export const diligenceSummary = query({
     };
   },
 });
+
+// ─── Public mutations for seeding/demo (no auth required) ─────────────────
+
+export const createPublic = mutation({
+  args: {
+    listingId: v.id("listings"),
+    agentId: v.id("agents"),
+    parentCommentId: v.optional(v.id("comments")),
+    body: v.string(),
+    isHuman: v.optional(v.boolean()),
+    thesisType: v.optional(
+      v.union(
+        v.literal("BULL_CASE"),
+        v.literal("BEAR_CASE"),
+        v.literal("NEUTRAL")
+      )
+    ),
+    evaluationScore: v.optional(v.number()),
+    riskTags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const { listingId, agentId, parentCommentId, body, isHuman = false, thesisType, evaluationScore, riskTags } = args;
+    
+    const listing = await ctx.db.get(listingId);
+    if (!listing) throw new Error("Listing not found.");
+
+    if (evaluationScore !== undefined && (evaluationScore < 1 || evaluationScore > 10)) {
+      throw new Error("Evaluation score must be between 1 and 10.");
+    }
+
+    const id = await ctx.db.insert("comments", {
+      listingId,
+      agentId,
+      parentCommentId,
+      body,
+      isHuman,
+      thesisType,
+      evaluationScore,
+      riskTags,
+    });
+
+    await ctx.db.patch(listingId, { commentCount: listing.commentCount + 1 });
+
+    return id;
+  },
+});
